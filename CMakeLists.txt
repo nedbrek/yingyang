@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 project(YING_YANG)
 
 find_package(OpenGL REQUIRED)
+find_package(GLEW 2.0 REQUIRED)
 find_package(glfw3 3.2 REQUIRED)
 
 if (CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -10,6 +11,7 @@ endif()
 
 set(ALL_LIBS
 	${OPENGL_LIBRARY}
+	GLEW::GLEW
 	glfw
 )
 
