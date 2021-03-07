@@ -1,6 +1,8 @@
 // needs to be before GL
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -165,6 +167,25 @@ int main(int argc, char **argv)
 	// read and compile shaders
 	GLuint program_id = loadShaders("../simple.vert.glsl", "../simple.frag.glsl");
 
+	// get a handle for our "MVP" uniform
+	GLuint matrix_id = glGetUniformLocation(program_id, "MVP");
+
+	// projection matrix: 45 deg field of view, 4:3 ratio, display range : 0.1 unit <-> 100 units
+	glm::mat4 projection = glm::perspective(glm::radians(45.0f), 4.0f / 3.0f, 0.1f, 100.0f);
+
+	// camera matrix
+	glm::mat4 view = glm::lookAt(
+	                     glm::vec3(4, 3, 3), // camera is at (4,3,3), in world space
+	                     glm::vec3(0, 0, 0), // and looks at the origin
+	                     glm::vec3(0, 1, 0)  // head is up (set to 0,-1,0 to look upside-down)
+	                 );
+
+	// model matrix: an identity matrix (model will be at the origin)
+	glm::mat4 model = glm::mat4(1.0f);
+
+	// ModelViewProjection: multiply 3 matrices
+	glm::mat4 mvp = projection * view * model; // matrix multiplication is right to left
+
 	GLuint vertex_buffer;
 	glGenBuffers(1, &vertex_buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
@@ -176,6 +197,9 @@ int main(int argc, char **argv)
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		glUseProgram(program_id);
+
+		// set model view projection matrix
+		glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
 
 		// here is where we draw
 		//
