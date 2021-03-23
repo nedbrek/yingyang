@@ -1,5 +1,6 @@
 // needs to be before GL
 #include <GL/glew.h>
+#include "controls.hpp"
 #include "loadBmp.h"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -146,9 +147,12 @@ int main(int argc, char **argv)
 		glfwTerminate();
 		return 3;
 	}
+	Controls *controls = new Controls(window);
 
 	// make sure we get all key presses
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
+	// hide mouse cursor
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	// background color (blue .4)
 	glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
@@ -208,22 +212,6 @@ int main(int argc, char **argv)
 
 	// get a handle for our "MVP" uniform
 	GLuint matrix_id = glGetUniformLocation(program_id, "MVP");
-
-	// projection matrix: 45 deg field of view, 4:3 ratio, display range : 0.1 unit <-> 100 units
-	glm::mat4 projection = glm::perspective(glm::radians(45.0f), 4.0f / 3.0f, 0.1f, 100.0f);
-
-	// camera matrix
-	glm::mat4 view = glm::lookAt(
-	                     glm::vec3(4, 3, -3), // camera is at (4,3,3), in world space
-	                     glm::vec3(0, 0, 0), // and looks at the origin
-	                     glm::vec3(0, 1, 0)  // head is up (set to 0,-1,0 to look upside-down)
-	                 );
-
-	// model matrix: an identity matrix (model will be at the origin)
-	glm::mat4 model = glm::mat4(1.0f);
-
-	// ModelViewProjection: multiply 3 matrices
-	glm::mat4 mvp = projection * view * model; // matrix multiplication is right to left
 
 	// load the texture using any two methods
 	GLuint texture = loadBmp("../uvtemplate.bmp");
@@ -330,6 +318,13 @@ int main(int argc, char **argv)
 
 		glUseProgram(program_id);
 
+		// Compute the MVP matrix from keyboard and mouse input
+		controls->computeMatricesFromInputs();
+		glm::mat4 projection_matrix = controls->projectionMatrix();
+		glm::mat4 view_matrix = controls->viewMatrix();
+		glm::mat4 model_matrix = glm::mat4(1.0);
+		glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
+
 		// set model view projection matrix
 		glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
 
@@ -381,6 +376,7 @@ int main(int argc, char **argv)
 	glDeleteVertexArrays(1, &vertex_array_id);
 	glDeleteProgram(program_id);
 
+	delete controls;
 	glfwTerminate();
 	return 0;
 }
