@@ -132,6 +132,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	const char *obj_path = "../cube.obj";
+	if (argc > 1)
+	{
+		obj_path = argv[1];
+	}
+
 	// create main window
 	GLFWwindow *window = glfwCreateWindow( 1024, 768, "YingYang", NULL, NULL);
 	if (!window)
@@ -171,15 +177,17 @@ int main(int argc, char **argv)
 	std::vector<glm::vec3> vertex_buffer_data;
 	std::vector<glm::vec2> uv_buffer_data;
 	std::vector<glm::vec3> normal_buffer_data;
-	loadObj("../cube.obj", vertex_buffer_data, uv_buffer_data, normal_buffer_data, true);
+	loadObj(obj_path, vertex_buffer_data, uv_buffer_data, normal_buffer_data, true);
 
 	glBindVertexArray(vertex_array_id);
 
 	// read and compile shaders
-	GLuint program_id = loadShaders("../simple.vert.glsl", "../texture.frag.glsl");
+	GLuint program_id = loadShaders("../standardShading.vert.glsl", "../standardShading.frag.glsl");
 
 	// get a handle for our "MVP" uniform
 	GLuint matrix_id = glGetUniformLocation(program_id, "MVP");
+	GLuint view_matrix_id = glGetUniformLocation(program_id, "V");
+	GLuint model_matrix_id = glGetUniformLocation(program_id, "M");
 
 	// load the texture using any two methods
 	GLuint texture = loadBmp("../uvtemplate.bmp");
@@ -198,6 +206,14 @@ int main(int argc, char **argv)
 	glBindBuffer(GL_ARRAY_BUFFER, uvbuffer);
 	glBufferData(GL_ARRAY_BUFFER, uv_buffer_data.size() * sizeof(glm::vec2), &uv_buffer_data[0], GL_STATIC_DRAW);
 
+	GLuint normalbuffer;
+	glGenBuffers(1, &normalbuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, normalbuffer);
+	glBufferData(GL_ARRAY_BUFFER, normal_buffer_data.size() * sizeof(glm::vec3), &normal_buffer_data[0], GL_STATIC_DRAW);
+
+	glUseProgram(program_id);
+	GLuint light_id = glGetUniformLocation(program_id, "LightPosition_worldspace");
+
 	do
 	{
 		// erase screen before drawing
@@ -214,6 +230,11 @@ int main(int argc, char **argv)
 
 		// set model view projection matrix
 		glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
+		glUniformMatrix4fv(model_matrix_id, 1, GL_FALSE, &model_matrix[0][0]);
+		glUniformMatrix4fv(view_matrix_id, 1, GL_FALSE, &view_matrix[0][0]);
+
+		glm::vec3 light_pos = glm::vec3(4,4,4);
+		glUniform3f(light_id, light_pos.x, light_pos.y, light_pos.z);
 
 		// here is where we draw
 		//
@@ -241,12 +262,25 @@ int main(int argc, char **argv)
 			(void*)0                          // array buffer offset
 		);
 
+		// 3rd attribute buffer : normals
+		glEnableVertexAttribArray(2);
+		glBindBuffer(GL_ARRAY_BUFFER, normalbuffer);
+		glVertexAttribPointer(
+			2,                                // attribute
+			3,                                // size
+			GL_FLOAT,                         // type
+			GL_FALSE,                         // normalized?
+			0,                                // stride
+			(void*)0                          // array buffer offset
+		);
+
 		// Draw the triangles!
 		glDrawArrays(GL_TRIANGLES, 0, vertex_buffer_data.size());
 
 		// done with that attribute
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
+		glDisableVertexAttribArray(2);
 
 		// done drawing! swap buffer to front
 		glfwSwapBuffers(window);
@@ -259,6 +293,7 @@ int main(int argc, char **argv)
 	// Cleanup VBO
 	glDeleteBuffers(1, &vertex_buffer);
 	glDeleteBuffers(1, &uvbuffer);
+	glDeleteBuffers(1, &normalbuffer);
 	glDeleteTextures(1, &texture);
 	glDeleteVertexArrays(1, &vertex_array_id);
 	glDeleteProgram(program_id);
