@@ -167,7 +167,9 @@ int main(int argc, char **argv)
 	glGenVertexArrays(1, &vertex_array_id);
 
 	// put a triangle in the vertex buffer
-	const GLfloat vertex_buffer_data[] = {
+	// Vertices. Three consecutive floats give a 3D vertex; Three consecutive vertices give a triangle.
+	// A cube has 6 faces with 2 triangles each, so this makes 6*2=12 triangles, and 12*3 vertices
+	const GLfloat vertex_buffer_data[36*3] = {
 		-1.0f,-1.0f,-1.0f,
 		-1.0f,-1.0f, 1.0f,
 		-1.0f, 1.0f, 1.0f,
@@ -220,49 +222,8 @@ int main(int argc, char **argv)
 	// get a handle for our texture sampler uniform
 	GLuint TextureID  = glGetUniformLocation(program_id, "myTextureSampler");
 
-	// Vertices. Three consecutive floats give a 3D vertex; Three consecutive vertices give a triangle.
-	// A cube has 6 faces with 2 triangles each, so this makes 6*2=12 triangles, and 12*3 vertices
-	const GLfloat g_vertex_buffer_data[] = {
-		-1.0f,-1.0f,-1.0f,
-		-1.0f,-1.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,
-		 1.0f, 1.0f,-1.0f,
-		-1.0f,-1.0f,-1.0f,
-		-1.0f, 1.0f,-1.0f,
-		 1.0f,-1.0f, 1.0f,
-		-1.0f,-1.0f,-1.0f,
-		 1.0f,-1.0f,-1.0f,
-		 1.0f, 1.0f,-1.0f,
-		 1.0f,-1.0f,-1.0f,
-		-1.0f,-1.0f,-1.0f,
-		-1.0f,-1.0f,-1.0f,
-		-1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f,-1.0f,
-		 1.0f,-1.0f, 1.0f,
-		-1.0f,-1.0f, 1.0f,
-		-1.0f,-1.0f,-1.0f,
-		-1.0f, 1.0f, 1.0f,
-		-1.0f,-1.0f, 1.0f,
-		 1.0f,-1.0f, 1.0f,
-		 1.0f, 1.0f, 1.0f,
-		 1.0f,-1.0f,-1.0f,
-		 1.0f, 1.0f,-1.0f,
-		 1.0f,-1.0f,-1.0f,
-		 1.0f, 1.0f, 1.0f,
-		 1.0f,-1.0f, 1.0f,
-		 1.0f, 1.0f, 1.0f,
-		 1.0f, 1.0f,-1.0f,
-		-1.0f, 1.0f,-1.0f,
-		 1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f,-1.0f,
-		-1.0f, 1.0f, 1.0f,
-		 1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,
-		 1.0f,-1.0f, 1.0f
-	};
-
 	// Two UV coordinatesfor each vertex. They were created with Blender.
-	const GLfloat g_uv_buffer_data[] = {
+	const GLfloat g_uv_buffer_data[36*2] = {
 		0.000059f, 1.0f-0.000004f,
 		0.000103f, 1.0f-0.336048f,
 		0.335973f, 1.0f-0.335903f,
@@ -311,6 +272,18 @@ int main(int argc, char **argv)
 	glBindBuffer(GL_ARRAY_BUFFER, uvbuffer);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(g_uv_buffer_data), g_uv_buffer_data, GL_STATIC_DRAW);
 
+	std::vector<unsigned> index_data;
+	const unsigned vertex_buffer_data_size = sizeof(vertex_buffer_data) / sizeof(vertex_buffer_data[0]);
+	for (unsigned i = 0; i < vertex_buffer_data_size/3; ++i)
+	{
+		index_data.push_back(i);
+	}
+
+	GLuint idx_buffer;
+	glGenBuffers(1, &idx_buffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idx_buffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_data[0])*index_data.size(), &index_data[0], GL_STATIC_DRAW);
+
 	do
 	{
 		// erase screen before drawing
@@ -355,7 +328,8 @@ int main(int argc, char **argv)
 		);
 
 		// Draw the triangles!
-		glDrawArrays(GL_TRIANGLES, 0, 12*3); // 12*3 indices starting at 0 -> 12 triangles
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idx_buffer);
+		glDrawElements(GL_TRIANGLES, index_data.size(), GL_UNSIGNED_INT, (void*)0);
 
 		// done with that attribute
 		glDisableVertexAttribArray(0);
