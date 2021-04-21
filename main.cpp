@@ -2,6 +2,9 @@
 #include <GL/glew.h>
 #include "controls.hpp"
 #include "loadBmp.h"
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -9,6 +12,78 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+
+/// One mesh in the scene
+class Mesh
+{
+public:
+	Mesh() = default;
+
+	Mesh(GLuint vertex_buffer,
+	     GLuint uv_buffer,
+	     GLuint normal_buffer,
+	     GLuint face_buffer,
+	     unsigned num_faces)
+	: vertex_buffer_(vertex_buffer)
+	, uv_buffer_(uv_buffer)
+	, normal_buffer_(normal_buffer)
+	, num_faces_(num_faces)
+	{
+	}
+
+	void render()
+	{
+		// attribute 0 - vertex data
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
+		glVertexAttribPointer(
+			0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
+			3,                  // size
+			GL_FLOAT,           // type
+			GL_FALSE,           // normalized?
+			0,                  // stride
+			(void*)0            // array buffer offset
+		);
+
+		glEnableVertexAttribArray(1);
+		glBindBuffer(GL_ARRAY_BUFFER, uv_buffer_);
+		glVertexAttribPointer(
+			1,                                // attribute. No particular reason for 1, but must match the layout in the shader.
+			2,                                // size
+			GL_FLOAT,                         // type
+			GL_FALSE,                         // normalized?
+			0,                                // stride
+			(void*)0                          // array buffer offset
+		);
+
+		glEnableVertexAttribArray(2);
+		glBindBuffer(GL_ARRAY_BUFFER, normal_buffer_);
+		glVertexAttribPointer(
+			2,                                // attribute
+			3,                                // size
+			GL_FLOAT,                         // type
+			GL_FALSE,                         // normalized?
+			0,                                // stride
+			(void*)0                          // array buffer offset
+		);
+
+		// draw the triangles!
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, face_buffer_);
+		glDrawElements(GL_TRIANGLES, num_faces_, GL_UNSIGNED_INT, (void*)0);
+
+		// done
+		glDisableVertexAttribArray(0);
+		glDisableVertexAttribArray(1);
+		glDisableVertexAttribArray(2);
+	}
+
+protected: // data
+	GLuint vertex_buffer_ = 0; ///< vertex buffer id
+	GLuint uv_buffer_ = 0;     ///< uv buffer id
+	GLuint normal_buffer_ = 0; ///<  normal buffer id
+	GLuint face_buffer_ = 0;   ///< faces hold indexes of vertexes
+	unsigned num_faces_ = 0;
+};
 
 GLuint loadShaders(const std::string &vertex_file_path, const std::string &fragment_file_path)
 {
@@ -162,52 +237,104 @@ int main(int argc, char **argv)
 	// accept fragment if it closer to the camera than the former one
 	glDepthFunc(GL_LESS);
 
+	const char *obj_path = "../cube.obj";
+	if (argc > 1)
+		obj_path = argv[1];
+
+	Assimp::Importer importer;
+	// TODO: other flags? configuration?
+	const unsigned flags = aiProcess_CalcTangentSpace
+	    | aiProcess_Triangulate
+	    | aiProcess_JoinIdenticalVertices
+	    | aiProcess_SortByPType;
+	const aiScene *scene = importer.ReadFile(obj_path, flags);
+	if (!scene)
+	{
+		std::cerr << "Failed to import " << obj_path << std::endl;
+		return false;
+	}
+
 	// main vertex array
 	GLuint vertex_array_id;
 	glGenVertexArrays(1, &vertex_array_id);
-
-	// put a triangle in the vertex buffer
-	// Vertices. Three consecutive floats give a 3D vertex; Three consecutive vertices give a triangle.
-	// A cube has 6 faces with 2 triangles each, so this makes 6*2=12 triangles, and 12*3 vertices
-	const GLfloat vertex_buffer_data[36*3] = {
-		-1.0f,-1.0f,-1.0f,
-		-1.0f,-1.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,
-		 1.0f, 1.0f,-1.0f,
-		-1.0f,-1.0f,-1.0f,
-		-1.0f, 1.0f,-1.0f,
-		 1.0f,-1.0f, 1.0f,
-		-1.0f,-1.0f,-1.0f,
-		 1.0f,-1.0f,-1.0f,
-		 1.0f, 1.0f,-1.0f,
-		 1.0f,-1.0f,-1.0f,
-		-1.0f,-1.0f,-1.0f,
-		-1.0f,-1.0f,-1.0f,
-		-1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f,-1.0f,
-		 1.0f,-1.0f, 1.0f,
-		-1.0f,-1.0f, 1.0f,
-		-1.0f,-1.0f,-1.0f,
-		-1.0f, 1.0f, 1.0f,
-		-1.0f,-1.0f, 1.0f,
-		 1.0f,-1.0f, 1.0f,
-		 1.0f, 1.0f, 1.0f,
-		 1.0f,-1.0f,-1.0f,
-		 1.0f, 1.0f,-1.0f,
-		 1.0f,-1.0f,-1.0f,
-		 1.0f, 1.0f, 1.0f,
-		 1.0f,-1.0f, 1.0f,
-		 1.0f, 1.0f, 1.0f,
-		 1.0f, 1.0f,-1.0f,
-		-1.0f, 1.0f,-1.0f,
-		 1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f,-1.0f,
-		-1.0f, 1.0f, 1.0f,
-		 1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,
-		 1.0f,-1.0f, 1.0f
-	};
 	glBindVertexArray(vertex_array_id);
+
+	std::vector<GLfloat> vertex_buffer_data;
+	std::vector<GLfloat> uv_buffer_data;
+	std::vector<GLfloat> normal_buffer_data;
+	std::vector<unsigned> index_data;
+
+	int mesh_num = 0;
+	if (argc > 2)
+		mesh_num = atoi(argv[2]);
+
+	const aiMesh *paiMesh = scene->mMeshes[mesh_num];
+	const bool has_texture_coords = paiMesh->HasTextureCoords(0);
+	const bool has_normals = paiMesh->HasNormals();
+
+	const glm::vec3 zero(0.f, 0.f, 0.f);
+	for (unsigned j = 0; j < paiMesh->mNumVertices; ++j)
+	{
+		const aiVector3D *pPos = &paiMesh->mVertices[j];
+		vertex_buffer_data.push_back(pPos->x);
+		vertex_buffer_data.push_back(pPos->y);
+		vertex_buffer_data.push_back(pPos->z);
+
+		if (has_texture_coords)
+		{
+			const aiVector3D *pTexCoord = &paiMesh->mTextureCoords[0][j];
+			uv_buffer_data.push_back(pTexCoord->x);
+			uv_buffer_data.push_back(pTexCoord->y);
+		}
+		else
+		{
+			uv_buffer_data.push_back(zero.x);
+			uv_buffer_data.push_back(zero.y);
+		}
+
+		if (has_normals)
+		{
+			const aiVector3D *pNormal = &paiMesh->mNormals[j];
+			normal_buffer_data.push_back(pNormal->x);
+			normal_buffer_data.push_back(pNormal->y);
+			normal_buffer_data.push_back(pNormal->z);
+		}
+		else
+		{
+			normal_buffer_data.push_back(zero.x);
+			normal_buffer_data.push_back(zero.y);
+			normal_buffer_data.push_back(zero.z);
+		}
+	}
+
+	for (unsigned i = 0; i < paiMesh->mNumFaces; ++i)
+	{
+		const aiFace &face = paiMesh->mFaces[i];
+		for (unsigned j = 0; j < face.mNumIndices; ++j)
+		{
+			index_data.push_back(face.mIndices[j]);
+		}
+	}
+
+	GLuint vertex_buffer;
+	glGenBuffers(1, &vertex_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_buffer_data[0])*vertex_buffer_data.size(), &vertex_buffer_data[0], GL_STATIC_DRAW);
+
+	GLuint uvbuffer;
+	glGenBuffers(1, &uvbuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, uvbuffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(uv_buffer_data[0])*uv_buffer_data.size(), &uv_buffer_data[0], GL_STATIC_DRAW);
+
+	GLuint normalbuffer;
+	glGenBuffers(1, &normalbuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, normalbuffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(normal_buffer_data[0])*normal_buffer_data.size(), &normal_buffer_data[0], GL_STATIC_DRAW);
+
+	GLuint idx_buffer;
+	glGenBuffers(1, &idx_buffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idx_buffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_data[0])*index_data.size(), &index_data[0], GL_STATIC_DRAW);
 
 	// read and compile shaders
 	GLuint program_id = loadShaders("../simple.vert.glsl", "../texture.frag.glsl");
@@ -221,68 +348,6 @@ int main(int argc, char **argv)
 
 	// get a handle for our texture sampler uniform
 	GLuint TextureID  = glGetUniformLocation(program_id, "myTextureSampler");
-
-	// Two UV coordinatesfor each vertex. They were created with Blender.
-	const GLfloat g_uv_buffer_data[36*2] = {
-		0.000059f, 1.0f-0.000004f,
-		0.000103f, 1.0f-0.336048f,
-		0.335973f, 1.0f-0.335903f,
-		1.000023f, 1.0f-0.000013f,
-		0.667979f, 1.0f-0.335851f,
-		0.999958f, 1.0f-0.336064f,
-		0.667979f, 1.0f-0.335851f,
-		0.336024f, 1.0f-0.671877f,
-		0.667969f, 1.0f-0.671889f,
-		1.000023f, 1.0f-0.000013f,
-		0.668104f, 1.0f-0.000013f,
-		0.667979f, 1.0f-0.335851f,
-		0.000059f, 1.0f-0.000004f,
-		0.335973f, 1.0f-0.335903f,
-		0.336098f, 1.0f-0.000071f,
-		0.667979f, 1.0f-0.335851f,
-		0.335973f, 1.0f-0.335903f,
-		0.336024f, 1.0f-0.671877f,
-		1.000004f, 1.0f-0.671847f,
-		0.999958f, 1.0f-0.336064f,
-		0.667979f, 1.0f-0.335851f,
-		0.668104f, 1.0f-0.000013f,
-		0.335973f, 1.0f-0.335903f,
-		0.667979f, 1.0f-0.335851f,
-		0.335973f, 1.0f-0.335903f,
-		0.668104f, 1.0f-0.000013f,
-		0.336098f, 1.0f-0.000071f,
-		0.000103f, 1.0f-0.336048f,
-		0.000004f, 1.0f-0.671870f,
-		0.336024f, 1.0f-0.671877f,
-		0.000103f, 1.0f-0.336048f,
-		0.336024f, 1.0f-0.671877f,
-		0.335973f, 1.0f-0.335903f,
-		0.667969f, 1.0f-0.671889f,
-		1.000004f, 1.0f-0.671847f,
-		0.667979f, 1.0f-0.335851f
-	};
-
-	GLuint vertex_buffer;
-	glGenBuffers(1, &vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_buffer_data), vertex_buffer_data, GL_STATIC_DRAW);
-
-	GLuint uvbuffer;
-	glGenBuffers(1, &uvbuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, uvbuffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(g_uv_buffer_data), g_uv_buffer_data, GL_STATIC_DRAW);
-
-	std::vector<unsigned> index_data;
-	const unsigned vertex_buffer_data_size = sizeof(vertex_buffer_data) / sizeof(vertex_buffer_data[0]);
-	for (unsigned i = 0; i < vertex_buffer_data_size/3; ++i)
-	{
-		index_data.push_back(i);
-	}
-
-	GLuint idx_buffer;
-	glGenBuffers(1, &idx_buffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idx_buffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_data[0])*index_data.size(), &index_data[0], GL_STATIC_DRAW);
 
 	do
 	{
