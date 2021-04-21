@@ -21,7 +21,6 @@ add_executable(yingyang
 	main.cpp
 	controls.cpp
 	loadBmp.cpp
-	loadObj.cpp
 )
 target_link_libraries(yingyang
 	${ALL_LIBS}

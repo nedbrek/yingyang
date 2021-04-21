@@ -2,7 +2,6 @@
 #include <GL/glew.h>
 #include "controls.hpp"
 #include "loadBmp.h"
-#include "loadObj.hpp"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
