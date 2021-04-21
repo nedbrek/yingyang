@@ -27,6 +27,7 @@ public:
 	: vertex_buffer_(vertex_buffer)
 	, uv_buffer_(uv_buffer)
 	, normal_buffer_(normal_buffer)
+	, face_buffer_(face_buffer)
 	, num_faces_(num_faces)
 	{
 	}
@@ -336,6 +337,8 @@ int main(int argc, char **argv)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idx_buffer);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_data[0])*index_data.size(), &index_data[0], GL_STATIC_DRAW);
 
+	Mesh *mesh = new Mesh(vertex_buffer, uvbuffer, normalbuffer, idx_buffer, index_data.size());
+
 	// read and compile shaders
 	GLuint program_id = loadShaders("../simple.vert.glsl", "../texture.frag.glsl");
 
@@ -367,38 +370,7 @@ int main(int argc, char **argv)
 		glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
 
 		// here is where we draw
-		//
-		// 1st attribute buffer : vertices
-		glEnableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-		glVertexAttribPointer(
-			0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
-			3,                  // size
-			GL_FLOAT,           // type
-			GL_FALSE,           // normalized?
-			0,                  // stride
-			(void*)0            // array buffer offset
-		);
-
-		// 2nd attribute buffer: colors
-		glEnableVertexAttribArray(1);
-		glBindBuffer(GL_ARRAY_BUFFER, uvbuffer);
-		glVertexAttribPointer(
-			1,                                // attribute. No particular reason for 1, but must match the layout in the shader.
-			2,                                // size
-			GL_FLOAT,                         // type
-			GL_FALSE,                         // normalized?
-			0,                                // stride
-			(void*)0                          // array buffer offset
-		);
-
-		// Draw the triangles!
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idx_buffer);
-		glDrawElements(GL_TRIANGLES, index_data.size(), GL_UNSIGNED_INT, (void*)0);
-
-		// done with that attribute
-		glDisableVertexAttribArray(0);
-		glDisableVertexAttribArray(1);
+		mesh->render();
 
 		// done drawing! swap buffer to front
 		glfwSwapBuffers(window);
