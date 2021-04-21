@@ -235,6 +235,13 @@ class Scene
 public:
 	Scene() = default;
 
+	~Scene()
+	{
+		// Cleanup VBO
+		glDeleteTextures(1, &texture_);
+		glDeleteProgram(program_id_);
+	}
+
 	bool load(const char *obj_path)
 	{
 		Assimp::Importer importer;
@@ -249,6 +256,24 @@ public:
 			std::cerr << "Failed to import " << obj_path << std::endl;
 			return false;
 		}
+
+		// read and compile shaders
+		program_id_ = loadShaders("../standardShading.vert.glsl", "../standardShading.frag.glsl");
+
+		// get a handle for our "MVP" uniform
+		matrix_id_ = glGetUniformLocation(program_id_, "MVP");
+		view_matrix_id_ = glGetUniformLocation(program_id_, "V");
+		model_matrix_id_ = glGetUniformLocation(program_id_, "M");
+
+		// load the texture using any two methods
+		texture_ = loadBmp("../uvtemplate.bmp");
+		//texture_ = loadDDS("uvtemplate.DDS");
+
+		// get a handle for our texture sampler uniform
+		texture_id_  = glGetUniformLocation(program_id_, "myTextureSampler");
+
+		glUseProgram(program_id_);
+		light_id_ = glGetUniformLocation(program_id_, "LightPosition_worldspace");
 
 		// TODO: materials
 		// TODO: animations
@@ -335,15 +360,44 @@ public:
 		return true;
 	}
 
-	void render()
+	void render(Controls *controls)
 	{
-		// TODO pass in MVP
+		glUseProgram(program_id_);
+
+		// Compute the MVP matrix from keyboard and mouse input
+		controls->computeMatricesFromInputs();
+		glm::mat4 projection_matrix = controls->projectionMatrix();
+
+		glm::mat4 view_matrix = controls->viewMatrix();
+		glm::mat4 model_matrix = glm::mat4(1.0);
+		glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
+
+		glm::vec3 light_pos = glm::vec3(4,4,4);
+		glUniform3f(light_id_, light_pos.x, light_pos.y, light_pos.z);
+
+		// set model view projection matrix
+		glUniformMatrix4fv(matrix_id_, 1, GL_FALSE, &mvp[0][0]);
+		glUniformMatrix4fv(model_matrix_id_, 1, GL_FALSE, &model_matrix[0][0]);
+		glUniformMatrix4fv(view_matrix_id_, 1, GL_FALSE, &view_matrix[0][0]);
+
 		root_->render();
 	}
 
 private:
-	Node *root_ = nullptr;
-	std::vector<Mesh*> meshes_;
+	Node *root_ = nullptr; ///< root of the model
+	std::vector<Mesh*> meshes_; ///< meshes used by the model
+
+	GLuint program_id_ = 0; ///< compiled vertex and shader program
+
+	// handles of "MVP" uniform
+	GLuint matrix_id_ = 0;
+	GLuint view_matrix_id_ = 0;
+	GLuint model_matrix_id_ = 0;
+
+	GLuint texture_ = 0; ///< texture id (image data in OpenGL)
+	GLuint texture_id_ = 0; ///< handle for our texture sampler uniform (for shader)
+
+	GLuint light_id_ = 0; ///< shader uniform
 };
 
 int main(int argc, char **argv)
@@ -390,12 +444,6 @@ int main(int argc, char **argv)
 		return 3;
 	}
 
-	Scene main_scene;
-	if (!main_scene.load(obj_path))
-	{
-		return 4;
-	}
-
 	Controls *controls = new Controls(window);
 
 	// make sure we get all key presses
@@ -412,47 +460,18 @@ int main(int argc, char **argv)
 	glDepthFunc(GL_LESS);
 	glEnable(GL_CULL_FACE);
 
-	// read and compile shaders
-	GLuint program_id = loadShaders("../standardShading.vert.glsl", "../standardShading.frag.glsl");
-
-	// get a handle for our "MVP" uniform
-	GLuint matrix_id = glGetUniformLocation(program_id, "MVP");
-	GLuint view_matrix_id = glGetUniformLocation(program_id, "V");
-	GLuint model_matrix_id = glGetUniformLocation(program_id, "M");
-
-	// load the texture using any two methods
-	GLuint texture = loadBmp("../uvtemplate.bmp");
-	//GLuint Texture = loadDDS("uvtemplate.DDS");
-
-	// get a handle for our texture sampler uniform
-	GLuint TextureID  = glGetUniformLocation(program_id, "myTextureSampler");
-
-	glUseProgram(program_id);
-	GLuint light_id = glGetUniformLocation(program_id, "LightPosition_worldspace");
+	Scene main_scene;
+	if (!main_scene.load(obj_path))
+	{
+		return 4;
+	}
 
 	do
 	{
 		// erase screen before drawing
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		glUseProgram(program_id);
-
-		// Compute the MVP matrix from keyboard and mouse input
-		controls->computeMatricesFromInputs();
-		glm::mat4 projection_matrix = controls->projectionMatrix();
-		glm::mat4 view_matrix = controls->viewMatrix();
-		glm::mat4 model_matrix = glm::mat4(1.0);
-		glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
-
-		// set model view projection matrix
-		glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
-		glUniformMatrix4fv(model_matrix_id, 1, GL_FALSE, &model_matrix[0][0]);
-		glUniformMatrix4fv(view_matrix_id, 1, GL_FALSE, &view_matrix[0][0]);
-
-		glm::vec3 light_pos = glm::vec3(4,4,4);
-		glUniform3f(light_id, light_pos.x, light_pos.y, light_pos.z);
-
-		main_scene.render();
+		main_scene.render(controls);
 
 		// done drawing! swap buffer to front
 		glfwSwapBuffers(window);
@@ -462,9 +481,6 @@ int main(int argc, char **argv)
 	} while (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS &&
 	         glfwWindowShouldClose(window) == 0);
 
-	// Cleanup VBO
-	glDeleteTextures(1, &texture);
-	glDeleteProgram(program_id);
 
 	delete controls;
 	glfwTerminate();
